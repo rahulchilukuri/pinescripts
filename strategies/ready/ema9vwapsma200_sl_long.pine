@@ -1,0 +1,54 @@
+//@version=5
+strategy("EMA-VWAP-LongTerm MA SL Strategy", overlay=true, default_qty_value=100, default_qty_type=strategy.percent_of_equity)
+
+// useDateFilter = input.bool(true, title="Filter Date Range of Backtest", group="Backtest Time Period")
+// backtestStartDate = input.time(timestamp("1 Jan 1995"))
+// backtestEndDate = input.time(timestamp("1 Jan 2099"))
+
+stopPercent         = input.float(title="Stop Loss Percent", defval=0.10, step=0.1, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline", confirm=true)
+shortTermDuration   = input.int(title="Short Term Duration", defval=9, confirm=true)
+shortTermMAType     = input.string(title="Short Term MA", defval="EMA", options=["SMA", "EMA"], confirm=true)
+longTermDuration    = input.int(title="Long Term Duration", defval=200, confirm=true)
+longTermMAType      = input.string(title="Long Term MA", defval="SMA", options=["SMA", "EMA"], confirm=true)
+
+// STEP 2. See if current bar falls inside the date range
+// inTradeWindow = not useDateFilter or (time >= backtestStartDate)
+//inTradeWindow = not useDateFilter or (time >= backtestStartDate and time <= backtestEndDate)
+
+// Define the EMA 9, VWAP, and SMA 200 indicators
+shortTermMA = shortTermMAType == "EMA" ? ta.ema(close, shortTermDuration): ta.sma(close, shortTermDuration)
+vwap        = ta.vwap(close)
+longTermMA  = longTermMAType == "SMA" ? ta.sma(close, longTermDuration) : ta.ema(close, longTermDuration) 
+
+// Define the strategy conditions
+// entrySignal = inTradeWindow and ta.crossover(ema9, vwap)
+// takeProfit = inTradeWindow and ta.crossunder(ema9, vwap) 
+
+// entrySignal = inTradeWindow and ta.crossover(ema9, vwap) and close > sma200
+// takeProfit = inTradeWindow and ta.crossunder(ema9, vwap) and close < sma200
+var float entryPrice = 0
+noOpenPosition  = strategy.position_size == 0
+longPosition    = strategy.position_size > 0
+entrySignal     = noOpenPosition and ta.crossover(shortTermMA, vwap) and close > longTermMA
+takeProfit      = longPosition and ta.crossunder(shortTermMA, vwap) and close < longTermMA
+actualStopPrcnt = longPosition ? ((entryPrice - close) / close) : na
+stopPrice       = longPosition ? entryPrice*(1-stopPercent) : na
+stopLoss        = longPosition and actualStopPrcnt > stopPercent
+
+// Execute trades based on the strategy conditions
+if (entrySignal)
+    strategy.entry("Long", strategy.long)
+
+if entrySignal[1]
+    entryPrice := open
+
+if (takeProfit or stopLoss)
+    strategy.close(id="Long", comment="Exit " + ((stopLoss ? "SL " : "TP ")+str.tostring(close-entryPrice)))
+    entryPrice := na
+
+// Plot the indicators on the chart
+plot(entryPrice, color=color.lime, style=plot.style_linebr)
+plot(stopPrice, color=color.red, style=plot.style_linebr, offset=-1)
+plot(shortTermMA, color=color.yellow)
+plot(vwap, color=color.white, linewidth=2)
+plot(longTermMA, color=color.purple, linewidth=2)
