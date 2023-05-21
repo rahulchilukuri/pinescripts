@@ -27,13 +27,16 @@ longTermMA  = longTermMAType == "SMA" ? ta.sma(close, longTermDuration) : ta.ema
 // entrySignal = inTradeWindow and ta.crossover(ema9, vwap) and close > sma200
 // takeProfit = inTradeWindow and ta.crossunder(ema9, vwap) and close < sma200
 var float entryPrice = 0
+var float stopPrice = 0
+var float risk = 0
 noOpenPosition  = strategy.position_size == 0
 longPosition    = strategy.position_size > 0
+reward          = close - entryPrice
 entrySignal     = noOpenPosition and ta.crossover(shortTermMA, vwap) and close > longTermMA
-takeProfit      = longPosition and ta.crossunder(shortTermMA, vwap) and close < longTermMA
-actualStopPrcnt = longPosition ? ((entryPrice - close) / close) : na
-stopPrice       = longPosition ? entryPrice*(1-stopPercent) : na
+takeProfit      = longPosition and reward > 0 and ta.crossunder(shortTermMA, vwap) and close < longTermMA
+actualStopPrcnt = longPosition ? ((-reward) / close) : na
 stopLoss        = longPosition and actualStopPrcnt > stopPercent
+rr              = risk > 0 ? reward/risk:na
 
 // Execute trades based on the strategy conditions
 if (entrySignal)
@@ -41,10 +44,16 @@ if (entrySignal)
 
 if entrySignal[1]
     entryPrice := open
+    risk       := entryPrice*stopPercent
+    stopPrice  := entryPrice-risk
 
 if (takeProfit or stopLoss)
-    strategy.close(id="Long", comment="Exit " + ((stopLoss ? "SL " : "TP ")+str.tostring(close-entryPrice)))
+    cText     = str.format("Exit {0}, diff:{1, number} entry: {2,number} exit: {3,number}", stopLoss? "SL":"TP",close-entryPrice, entryPrice, close)
+    tpText    = str.format("{0}, RR: {1,number, #.##}",cText, rr)
+    strategy.close(id="Long", comment=stopLoss ? cText : tpText)
     entryPrice := na
+    risk       := na
+    stopPrice  := na
 
 // Plot the indicators on the chart
 plot(entryPrice, color=color.lime, style=plot.style_linebr)
