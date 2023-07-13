@@ -1,0 +1,58 @@
+//@version=5
+//strategy(title = "Superstock WMA Script", overlay=true, default_qty_value=33, default_qty_type=strategy.percent_of_equity, initial_capital = 100000)
+strategy(title = "Superstock WMA Script", overlay=true, default_qty_value=100, default_qty_type=strategy.percent_of_equity)
+useDateFilter = input.bool(true, title="Filter Date Range of Backtest", group="Backtest Time Period")
+backtestStartDate = input.time(timestamp("1 Jan 1995"))
+backtestEndDate = input.time(timestamp("1 Jan 2099"))
+stopPercent = input.float(title="Stop Loss Percent", defval=0.07, step=0.01, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline")
+magicline = input.int(title='magical line MA', defval=10, minval=1, maxval=20)
+referenceLine = input.int(title='reference MA', defval=30, minval=20, maxval=50)
+
+
+//Visauls inspired by Chris Moody's Slingshot script
+//EMA Definitions
+inTradeWindow = not useDateFilter or (time >= backtestStartDate and time <= backtestEndDate)
+smaSlow = ta.sma(close, referenceLine)
+smaFast = ta.sma(close, magicline)
+
+var float entryPrice = 0
+var float stopPrice = 0
+var float risk = 0
+noOpenPosition  = strategy.position_size == 0
+longPosition    = strategy.position_size > 0
+reward          = close - entryPrice
+entrySignal     = noOpenPosition and close > smaFast and ta.crossover(smaFast, smaSlow)
+takeProfit      = longPosition and reward > 0 and close < smaFast and ta.crossunder(smaFast, smaSlow)
+actualStopPrcnt = longPosition ? ((-reward) / close) : na
+stopLoss        = longPosition and actualStopPrcnt > stopPercent
+rr              = risk > 0 ? reward/risk:na
+vwap        = ta.vwap(close)
+
+// Execute trades based on the strategy conditions
+if (entrySignal) and inTradeWindow
+//if (entrySignal)
+    strategy.entry("Long", strategy.long)
+
+if entrySignal[1]
+    entryPrice := open
+    risk       := entryPrice*stopPercent
+    stopPrice  := entryPrice-risk
+
+if (takeProfit or stopLoss) and inTradeWindow
+//if (takeProfit or stopLoss)    
+    // cText     = str.format("Exit {0}, diff:{1, number} entry: {2,number} exit: {3,number}", stopLoss? "SL":"TP",close-entryPrice, entryPrice, close)
+    // tpText    = str.format("{0}, RR: {1,number, #.##}",cText, rr)
+    // strategy.close(id="Long", comment=stopLoss ? cText : tpText)
+    strategy.close(id="Long", comment=stopLoss ? "SL":"TP")
+    entryPrice := na
+    risk       := na
+    stopPrice  := na
+
+//Color definition for Moving Averages
+plot(entryPrice, color=color.lime, style=plot.style_linebr)
+plot(stopPrice, color=color.red, style=plot.style_linebr, offset=-1)
+plot(vwap, color=color.white, linewidth=1)
+//Moving Average Plots and Fill
+col = smaFast > smaSlow ? color.purple : smaFast < smaSlow ? color.yellow : color.white
+p1 = plot(smaSlow, title="Slow MA", style=plot.style_line, linewidth=1, color=col)
+p2 = plot(smaFast, title="Fast MA", style=plot.style_line, linewidth=1, color=col)

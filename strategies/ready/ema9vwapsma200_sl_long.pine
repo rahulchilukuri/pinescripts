@@ -1,23 +1,21 @@
 //@version=5
-strategy("EMA-VWAP-LongTerm MA SL Strategy", overlay=true, default_qty_value=100, default_qty_type=strategy.percent_of_equity)
+strategy("EMA-VWAP-LongTerm MA SL Strategy", overlay=true,default_qty_type=strategy.percent_of_equity, default_qty_value=100)
 
-// useDateFilter = input.bool(true, title="Filter Date Range of Backtest", group="Backtest Time Period")
-// backtestStartDate = input.time(timestamp("1 Jan 1995"))
-// backtestEndDate = input.time(timestamp("1 Jan 2099"))
-
-stopPercent         = input.float(title="Stop Loss Percent", defval=0.10, step=0.1, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline", confirm=true)
+stopPercent         = input.float(title="Stop Loss Percent", defval=0.07, step=0.01, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline", confirm=true)
 shortTermDuration   = input.int(title="Short Term Duration", defval=9, confirm=true)
 shortTermMAType     = input.string(title="Short Term MA", defval="EMA", options=["SMA", "EMA"], confirm=true)
 longTermDuration    = input.int(title="Long Term Duration", defval=200, confirm=true)
 longTermMAType      = input.string(title="Long Term MA", defval="SMA", options=["SMA", "EMA"], confirm=true)
 
 // STEP 2. See if current bar falls inside the date range
-// inTradeWindow = not useDateFilter or (time >= backtestStartDate)
-//inTradeWindow = not useDateFilter or (time >= backtestStartDate and time <= backtestEndDate)
+useDateFilter = input.bool(true, title="Filter Date Range of Backtest", group="Backtest Time Period")
+backtestStartDate = input.time(timestamp("1 Jan 1995"))
+backtestEndDate = input.time(timestamp("1 Jan 2099"))
+inTradeWindow = not useDateFilter or (time >= backtestStartDate and time <= backtestEndDate)
 
-// Define the EMA 9, VWAP, and SMA 200 indicators
-shortTermMA = shortTermMAType == "EMA" ? ta.ema(close, shortTermDuration): ta.sma(close, shortTermDuration)
+// Define the VWAP, EMA 9, and SMA 200 indicators
 vwap        = ta.vwap(close)
+shortTermMA = shortTermMAType == "EMA" ? ta.ema(close, shortTermDuration): ta.sma(close, shortTermDuration)
 longTermMA  = longTermMAType == "SMA" ? ta.sma(close, longTermDuration) : ta.ema(close, longTermDuration) 
 
 // Define the strategy conditions
@@ -26,20 +24,23 @@ longTermMA  = longTermMAType == "SMA" ? ta.sma(close, longTermDuration) : ta.ema
 
 // entrySignal = inTradeWindow and ta.crossover(ema9, vwap) and close > sma200
 // takeProfit = inTradeWindow and ta.crossunder(ema9, vwap) and close < sma200
+
 var float entryPrice = 0
 var float stopPrice = 0
 var float risk = 0
+//shortPosition   = strategy.position_size < 0
+//reward          = longPosition? (close-entryPrice) : (shortPosition? entryPrice-close:na)
 noOpenPosition  = strategy.position_size == 0
 longPosition    = strategy.position_size > 0
 reward          = close - entryPrice
 entrySignal     = noOpenPosition and ta.crossover(shortTermMA, vwap) and close > longTermMA
 takeProfit      = longPosition and reward > 0 and ta.crossunder(shortTermMA, vwap) and close < longTermMA
 actualStopPrcnt = longPosition ? ((-reward) / close) : na
-stopLoss        = longPosition and actualStopPrcnt > stopPercent
+stopLoss        = longPosition and reward < 0 and actualStopPrcnt > stopPercent
 rr              = risk > 0 ? reward/risk:na
 
 // Execute trades based on the strategy conditions
-if (entrySignal)
+if (entrySignal) and inTradeWindow
     strategy.entry("Long", strategy.long)
 
 if entrySignal[1]
@@ -47,10 +48,11 @@ if entrySignal[1]
     risk       := entryPrice*stopPercent
     stopPrice  := entryPrice-risk
 
-if (takeProfit or stopLoss)
-    cText     = str.format("Exit {0}, diff:{1, number} entry: {2,number} exit: {3,number}", stopLoss? "SL":"TP",close-entryPrice, entryPrice, close)
-    tpText    = str.format("{0}, RR: {1,number, #.##}",cText, rr)
-    strategy.close(id="Long", comment=stopLoss ? cText : tpText)
+if (takeProfit or stopLoss) and inTradeWindow
+    // cText     = str.format("Exit {0}, diff:{1, number} entry: {2,number} exit: {3,number}", stopLoss? "SL":"TP",close-entryPrice, entryPrice, close)
+    // tpText    = str.format("{0}, RR: {1,number, #.##}",cText, rr)
+    // strategy.close(id="Long", comment=stopLoss ? cText : tpText)
+    strategy.close(id="Long", comment="Exit " +(stopLoss ? "SL" : "TP"))
     entryPrice := na
     risk       := na
     stopPrice  := na

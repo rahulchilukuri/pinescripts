@@ -1,0 +1,68 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © yy6jtw92sc
+
+//@version=5
+strategy("Triple EMA Strategy", overlay=true, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true)
+stopPercent         = input.float(title="Stop Loss Percent", defval=0.07, step=0.01, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline", confirm=true)
+shortTermDuration   = input.int(title="Short Term Duration", defval=8, confirm=true)
+shortTermMAType     = input.string(title="Short Term MA", defval="EMA", options=["SMA", "EMA"], confirm=true)
+mediumTermDuration  = input.int(title="Medium Term Duration", defval=26, confirm=true)
+mediumTermMAType    = input.string(title="Medium Term MA", defval="EMA", options=["SMA", "EMA"], confirm=true)
+longTermDuration    = input.int(title="Long Term Duration", defval=55, confirm=true)
+longTermMAType      = input.string(title="Long Term MA", defval="SMA", options=["SMA", "EMA"], confirm=true)
+
+useDateFilter = input.bool(true, title="Filter Date Range of Backtest", group="Backtest Time Period")
+backtestStartDate = input.time(timestamp("1 Jan 1995"))
+backtestEndDate = input.time(timestamp("1 Jan 2099"))
+inTradeWindow = not useDateFilter or (time >= backtestStartDate and time <= backtestEndDate)
+
+shortMA  = shortTermMAType == "EMA" ? ta.ema(close, shortTermDuration): ta.sma(close, shortTermDuration)
+mediumMA = mediumTermMAType == "EMA" ? ta.ema(close, mediumTermDuration): ta.sma(close, mediumTermDuration)
+longMA   = longTermMAType == "EMA" ? ta.ema(close, longTermDuration): ta.sma(close, longTermDuration)
+
+//uptrend when short > long and medium > long and medium < short
+// for buys short crossover medium and short > long
+//downtrend when short < long and medium < long and medium > short
+// for sells short crossunder medium and short < long
+openToTrade = strategy.position_size == 0
+longPosition = strategy.position_size > 0
+shortPosition = strategy.position_size < 0
+
+var float entryPrice = 0
+var float stopPrice = 0
+var float risk = 0
+
+reward          = longPosition? (close-entryPrice) : (shortPosition? entryPrice-close:na)
+actualStopPrcnt = not(openToTrade) ? ((-reward) / close) : na
+stopLoss        = reward < 0 and actualStopPrcnt > stopPercent
+rr              = risk > 0 ? reward/risk:na
+
+//longEntry       = openToTrade and shortMA > longMA and mediumMA > longMA and volumeRising //and ta.crossover(shortMA, mediumMA)
+longEntry       = openToTrade and shortMA > longMA and mediumMA > longMA //and ta.crossover(shortMA, mediumMA)
+longProfit      = longPosition and reward > 0 and shortMA < mediumMA and close < shortMA// and mediumMA < longMA
+// longEntry       = openToTrade and shortMA > longMA and mediumMA > longMA and mediumMA < shortMA
+// longProfit      = longPosition and reward > 0 and shortMA < mediumMA and close < shortMA
+
+if (longEntry) and inTradeWindow
+    strategy.entry("Long", strategy.long)
+
+if (longEntry[1])// or shortEntry[1])
+    entryPrice := open
+    risk       := entryPrice*stopPercent
+    stopPrice  := entryPrice-risk
+
+if (longProfit or stopLoss) and inTradeWindow
+    // cText     = str.format("Exit {0}, diff:{1, number} entry: {2,number} exit: {3,number}", stopLoss? "SL":"TP",close-entryPrice, entryPrice, close)
+    // tpText    = str.format("{0}, RR: {1,number, #.##}",cText, rr)
+    // strategy.close(id=longPosition ? "Long":"Short", comment=stopLoss ? cText : tpText)
+    strategy.close("Long", comment="Exit "+(stopLoss ? "SL":"TP"))
+    entryPrice := na
+    risk       := na
+    stopPrice  := na
+
+// Plot the indicators on the chart
+plot(entryPrice, color=color.lime, style=plot.style_linebr)
+plot(stopPrice, color=color.red, style=plot.style_linebr, offset=-1)
+plot(shortMA, color=color.yellow)
+plot(mediumMA, color=color.white, linewidth=2)
+plot(longMA, color=color.purple, linewidth=2)
