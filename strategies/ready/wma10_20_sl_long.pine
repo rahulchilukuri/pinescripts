@@ -1,6 +1,7 @@
 //@version=5
 //strategy(title = "Superstock WMA Script", overlay=true, default_qty_value=33, default_qty_type=strategy.percent_of_equity, initial_capital = 100000)
 strategy(title = "Superstock WMA Script", overlay=true, default_qty_value=100, default_qty_type=strategy.percent_of_equity)
+visible = input.bool(true, title="Show Chart lines", group="Strategy Parameters")
 useDateFilter = input.bool(true, title="Filter Date Range of Backtest", group="Backtest Time Period")
 backtestStartDate = input.time(timestamp("1 Jan 1995"))
 backtestEndDate = input.time(timestamp("1 Jan 2099"))
@@ -53,6 +54,6 @@ plot(entryPrice, color=color.lime, style=plot.style_linebr)
 plot(stopPrice, color=color.red, style=plot.style_linebr, offset=-1)
 plot(vwap, color=color.white, linewidth=1)
 //Moving Average Plots and Fill
-col = smaFast > smaSlow ? color.purple : smaFast < smaSlow ? color.yellow : color.white
+col = visible ? (smaFast > smaSlow ? color.purple : smaFast < smaSlow ? color.yellow : color.white) : na
 p1 = plot(smaSlow, title="Slow MA", style=plot.style_line, linewidth=1, color=col)
 p2 = plot(smaFast, title="Fast MA", style=plot.style_line, linewidth=1, color=col)

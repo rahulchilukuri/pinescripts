@@ -3,6 +3,7 @@
 
 //@version=5
 strategy("Triple EMA Strategy", overlay=true, default_qty_value=100, default_qty_type=strategy.percent_of_equity, process_orders_on_close=true)
+visible             = input.bool(true, title="Show Chart lines", group="Strategy Parameters")
 stopPercent         = input.float(title="Stop Loss Percent", defval=0.07, step=0.01, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline", confirm=true)
 shortTermDuration   = input.int(title="Short Term Duration", defval=8, confirm=true)
 shortTermMAType     = input.string(title="Short Term MA", defval="EMA", options=["SMA", "EMA"], confirm=true)
@@ -61,8 +62,8 @@ if (longProfit or stopLoss) and inTradeWindow
     stopPrice  := na
 
 // Plot the indicators on the chart
-plot(entryPrice, color=color.lime, style=plot.style_linebr)
-plot(stopPrice, color=color.red, style=plot.style_linebr, offset=-1)
-plot(shortMA, color=color.yellow)
-plot(mediumMA, color=color.white, linewidth=2)
-plot(longMA, color=color.purple, linewidth=2)
+plot(entryPrice, color= visible ? color.lime:na, style=plot.style_linebr)
+plot(stopPrice, color= visible ? color.red:na, style=plot.style_linebr, offset=-1)
+plot(shortMA, color= visible ? color.yellow:na)
+plot(mediumMA, color= visible ? color.white:na, linewidth=2)
+plot(longMA, color= visible ? color.purple:na, linewidth=2)

@@ -1,11 +1,15 @@
 //@version=5
 strategy("EMA-VWAP-LongTerm MA SL Strategy", overlay=true,default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+visible             = input.bool(true, title="Show Chart lines", group="Strategy Parameters")
+stopPercent         = input.float(title="Stop Loss Percent", defval=0.01, step=0.01, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline", confirm=true)
+shortTermDuration   = input.int(title="Short Term Duration", defval=9, confirm=true, group="Strategy Parameters")
+shortTermMAType     = input.string(title="Short Term MA", defval="EMA", options=["SMA", "EMA"], confirm=true, group="Strategy Parameters")
+longTermDuration    = input.int(title="Long Term Duration", defval=200, confirm=true, group="Strategy Parameters")
+longTermMAType      = input.string(title="Long Term MA", defval="SMA", options=["SMA", "EMA"], confirm=true, group="Strategy Parameters")
 
-stopPercent         = input.float(title="Stop Loss Percent", defval=0.07, step=0.01, group="Strategy Parameters", tooltip="Failsafe Stop Loss Percent Decline", confirm=true)
-shortTermDuration   = input.int(title="Short Term Duration", defval=9, confirm=true)
-shortTermMAType     = input.string(title="Short Term MA", defval="EMA", options=["SMA", "EMA"], confirm=true)
-longTermDuration    = input.int(title="Long Term Duration", defval=200, confirm=true)
-longTermMAType      = input.string(title="Long Term MA", defval="SMA", options=["SMA", "EMA"], confirm=true)
+weeklyShortTerm     = input.int(title="Weekly Short Term Duration", defval=10, confirm=true, group="Strategy Parameters")
+weeklyLongTerm      = input.int(title="Weekly Term Duration", defval=30, confirm=true, group="Strategy Parameters")
+
 
 // STEP 2. See if current bar falls inside the date range
 useDateFilter = input.bool(true, title="Filter Date Range of Backtest", group="Backtest Time Period")
@@ -28,18 +32,20 @@ longTermMA  = longTermMAType == "SMA" ? ta.sma(close, longTermDuration) : ta.ema
 var float entryPrice = 0
 var float stopPrice = 0
 var float risk = 0
+var float shortWeeklyMA = na
+var float longWeeklyMA = na
 //shortPosition   = strategy.position_size < 0
 //reward          = longPosition? (close-entryPrice) : (shortPosition? entryPrice-close:na)
 noOpenPosition  = strategy.position_size == 0
 longPosition    = strategy.position_size > 0
-reward          = close - entryPrice
 entrySignal     = noOpenPosition and ta.crossover(shortTermMA, vwap) and close > longTermMA
+reward          = na(entryPrice) ? na: close - entryPrice
 takeProfit      = longPosition and reward > 0 and ta.crossunder(shortTermMA, vwap) and close < longTermMA
 actualStopPrcnt = longPosition ? ((-reward) / close) : na
 stopLoss        = longPosition and reward < 0 and actualStopPrcnt > stopPercent
 rr              = risk > 0 ? reward/risk:na
 
-// Execute trades based on the strategy conditions
+// Execute trades based on the strategy conditiqons
 if (entrySignal) and inTradeWindow
     strategy.entry("Long", strategy.long)
 
@@ -57,9 +63,16 @@ if (takeProfit or stopLoss) and inTradeWindow
     risk       := na
     stopPrice  := na
 
+if timeframe.isweekly
+    shortWeeklyMA := ta.sma(close, weeklyShortTerm)
+    longWeeklyMA  := ta.sma(close, weeklyLongTerm)
+
 // Plot the indicators on the chart
-plot(entryPrice, color=color.lime, style=plot.style_linebr)
-plot(stopPrice, color=color.red, style=plot.style_linebr, offset=-1)
-plot(shortTermMA, color=color.yellow)
-plot(vwap, color=color.white, linewidth=2)
-plot(longTermMA, color=color.purple, linewidth=2)
+plot(entryPrice, color=visible? color.lime:na, style=plot.style_linebr)
+plot(stopPrice, color=visible?color.red:na, style=plot.style_linebr, offset=-1)
+plot(shortTermMA, color=visible?color.yellow:na)
+plot(vwap, color=visible?color.white:na, linewidth=2)
+plot(longTermMA, color=visible?color.purple:na, linewidth=2)
+
+plot(shortWeeklyMA, color = timeframe.isweekly ? color.blue:na, linewidth=2)
+plot(longWeeklyMA,  color = timeframe.isweekly ? color.maroon:na, linewidth=2)
