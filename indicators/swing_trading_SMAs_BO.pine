@@ -1,0 +1,70 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © yy6jtw92sc
+
+//@version=5
+indicator("SMAs and Relative Strength vs SPX", overlay=true)
+
+adrLength        = input.int(20, title="ADR Length", group = "Volatility Parameters", confirm = true, display = display.none)
+atrLength        = input.int(20, title="ATR Length", group = "Volatility Parameters", confirm = true, display = display.none)
+
+visible          = input.bool(defval = true, title="Visible", group = "Parameters", confirm = true)
+scaleFactor      = input.int(2500, title="RS Scaling Factor", minval = 1000, step = 1, group = "Parameters", confirm = true, display = display.none)
+dailyFast        = input.int(10, title="Slow", minval = 5, step = 1, group = "Daily Parameters", confirm = true)
+dailyMedium      = input.int(20, title="Medium", minval = 10, step = 1, group = "Daily Parameters", confirm = true)
+dailySlow        = input.int(50, title="Fast", minval = 20, step = 1, group = "Daily Parameters", confirm = true)
+ldailyFast       = input.int(100, title="LT Fast", minval = 20, step = 1, group = "Daily Parameters", confirm = true)
+ldailyMedium     = input.int(150, title="LT Medium", minval = 20, step = 1, group = "Daily Parameters", confirm = true)
+ldailySlow       = input.int(200, title="LT Slow", minval = 10, step = 1, group = "Daily Parameters", confirm = true)
+weeklyFast       = input.int(10, title="Slow", minval = 5, step = 1, group = "Weekly Parameters", confirm = true)
+weeklyMedium     = input.int(30, title="Medium", minval = 20, step = 1, group = "Weekly Parameters", confirm = true)
+weeklySlow       = input.int(40, title="Fast", minval = 30, step = 1, group = "Weekly Parameters", confirm = true)
+breakout         = input.float(0.04, title="Breakout %", minval = 0.04, step = 0.01, group = "Daily Parameters", confirm = true)
+avgVolume        = input.int(100000, title="Vol", minval = 100000, step = 100000, group = "Daily Parameters", confirm = true)
+
+fastColor        = visible ? color.blue : na
+mediumColor      = visible ? color.yellow : na
+slowColor        = visible ? color.purple : na
+
+// ltfastColor      = visible ? color.lime : na
+// ltmediumColor    = visible ? color.orange : na
+// ltslowColor      = visible ? color.red : na
+
+isDaily          = timeframe.isdaily
+isWeekly         = timeframe.isweekly
+vwap             = ta.vwap(close)
+slowSMA          = ta.sma(close, isWeekly ? weeklySlow : dailySlow)
+mediumSMA        = ta.sma(close, isWeekly ? weeklyMedium : dailyMedium)
+fastSMA          = ta.sma(close, isWeekly ? weeklyFast : dailyFast)
+
+spx              = request.security("SPX", timeframe.period, close)
+rsLine           = scaleFactor*(close/spx)
+
+isBreakout       = isDaily and (close/close[1] >= (1+breakout)) and (volume > volume[1]) and (volume >= avgVolume)
+isBreakDown      = isDaily and (close/close[1] <= (1-breakout)) and (volume > volume[1]) and (volume >= avgVolume)
+
+plot(fastSMA, color = fastColor, style=plot.style_linebr, linewidth = 1)
+plot(mediumSMA, color = mediumColor, style=plot.style_linebr, linewidth = 2)
+plot(slowSMA, color = slowColor, style=plot.style_linebr, linewidth = 1)
+plot(rsLine, color = (isDaily) ? rsLine[1] < rsLine ? color.aqua:color.orange:na, linewidth = 1)
+plotshape(series=rsLine, title="4% breakout", color= isBreakout ? color.white:(isBreakDown ? color.red:na), style=shape.flag, location=location.absolute, size=size.small)
+
+// ltFastSMA        = isWeekly ? na : ta.sma(close, ldailyFast)
+// ltMedSMA         = isWeekly ? na : ta.sma(close, ldailyMedium)
+// ltSlowSMA        = isWeekly ? na : ta.sma(close, ldailySlow)
+
+// plot(ltFastSMA, color = ltfastColor, style=plot.style_line, linewidth = 1)
+// plot(ltMedSMA, color = ltmediumColor, style=plot.style_line, linewidth = 1)
+// plot(ltSlowSMA, color = ltslowColor, style=plot.style_line, linewidth = 1)
+
+// Calculate ADR and ATR values
+atrValue = math.round(ta.atr(atrLength),2)
+adrValue = math.round(100*(ta.sma(high/close, adrLength) -1),2)
+
+// Create a table to display ADR and ATR values
+if barstate.islast and isDaily
+    var tableData = table.new(position = position.top_center, columns = 2, rows = 2, bgcolor=color.new(color.gray, 90), border_color=color.new(color.gray, 50))
+    table.cell(tableData, 0, 0, text = "ADR", bgcolor=color.new(color.blue, 90), text_color=color.white)
+    table.cell(tableData, 0, 1, text = str.tostring(adrValue)+"%", text_color=color.blue)
+
+    table.cell(tableData, 1, 0, text = "ATR", bgcolor=color.new(color.red, 90), text_color=color.white)
+    table.cell(tableData, 1, 1, text = str.tostring(atrValue), text_color=color.red)
