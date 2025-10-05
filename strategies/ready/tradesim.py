@@ -6,8 +6,11 @@ import math
 starting_balance = 65000
 num_trades = 250
 report_interval = 50
-seed = 25
+seed = 23
+calc_tax = True
+tax_pct = 30
 risk_percent = 0.01
+report_trades = True
 
 # Validate inputs
 assert risk_percent > 0, "Risk percent must be positive"
@@ -36,15 +39,18 @@ balance = starting_balance
 balance_history = [balance]
 max_balance = balance
 max_drawdown = 0
-
-# print("Trade Details:")
-# print(f"{'Trade':<6} {'Outcome':<8} {'RRR':<8} {'Risk':<8} {'Reward/Loss':<12} {'Balance':<12}")
-# print("-" * 50)
+if report_trades:
+    print("Trade Details:")
+    print(f"{'Trade':<6} {'Outcome':<8} {'RRR':<8} {'Risk':<8} {'Reward/Loss':<12} {'Balance':<12}")
+    print("-" * 50)
 
 for i, trade in enumerate(trades):
     risk_amount = math.floor(balance * risk_percent)
     if trade["win"]:
-        reward = math.floor(risk_amount * trade["rrr"])
+        if not calc_tax:
+            tax_pct=0
+        
+        reward = math.floor(risk_amount * trade["rrr"]) *(1-tax_pct/100)
         balance += reward
         outcome = "Win"
         amount = f"+${reward:,}"
@@ -54,15 +60,16 @@ for i, trade in enumerate(trades):
         amount = f"-${risk_amount:,}"
     balance = max(math.floor(balance), 0)  # Prevent negative balance
     balance_history.append(balance)
-    
+
     # Update max drawdown
     max_balance = max(max_balance, balance)
     drawdown = (max_balance - balance) / max_balance * 100
     max_drawdown = max(max_drawdown, drawdown)
-    
-    # Print trade details
-    # print(f"{i+1:<6} {outcome:<8} {trade['rrr']:<8.2f} ${risk_amount:<8,} {amount:<12} ${balance:<12,}")
-    
+
+    if report_trades:
+        # Print trade details
+        print(f"{i+1:<6} {outcome:<8} {trade['rrr']:<8.2f} ${risk_amount:<8,} {amount:<12} ${balance:<12,}")
+
     if balance <= 0:
         print(f"Account depleted after {i+1} trades")
         break
@@ -87,7 +94,7 @@ for i in range(0, len(balance_history), report_interval):
     if i == 0:
         print(f"Trade {i:3d}: ${balance_history[i]:,}  |  CR: {0.00:6.2f}%  |  PR:    N/A  |  WR:    N/A")
         continue
-    
+
     balance_val = balance_history[i]
     wins_so_far = sum(1 for t in trades[:i] if t["win"])
     total_so_far = i
