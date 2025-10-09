@@ -97,13 +97,14 @@ def simulate_trades(config, trades):
 
     if config["report_trades"]:
         print("Trade Details:")
-        print(f"{'Trade':<6} {'Outcome':<8} {'RRR':<8} {'Risk':<8} {'Reward/Loss':<12} {'Start Balance':<15} {'End Balance':<12}")
+        print(f"{'Trade':<6} {'Outcome':<8} {'RRR':<8} {'AR %':<8} {'Risk':<8} {'Reward/Loss':<12} {'Start Balance':<12} {'End Balance':<12}")
         print("-" * 80)
 
     for i, trade in enumerate(sampled_trades):
         current_risk_percent = adjust_risk_percent(capped_kelly_fraction, i, config["num_trades"], config["risk_decay_factors"])
         risk_amount = math.floor(balance * current_risk_percent)
         start = balance
+        actual_risk_pcnt = (risk_amount/start)*100
 
         if trade["win"]:
             profit = math.floor(risk_amount * trade["rrr"])
@@ -125,8 +126,8 @@ def simulate_trades(config, trades):
         drawdown = (max_balance - balance) / max_balance * 100
         max_drawdown = max(max_drawdown, drawdown)
 
-        if config["report_trades"] and reward < 0:
-            print(f"{i+1:<6} {outcome:<8} {trade['rrr']:<8.2f} ${risk_amount:<8,} {amount:<12} ${start:<12,} ${balance:<12,}")
+        if config["report_trades"]:
+            print(f"{i+1:<6} {outcome:<8} {trade['rrr']:<8.2f} {actual_risk_pcnt:<8.2f} ${risk_amount:<8,} {amount:<12} ${start:<12,} ${balance:<12,}")
 
         if balance <= 0:
             print(f"Account depleted after {i+1} trades")
